@@ -1,8 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+
+# macOS
+.DS_Store
+
+# Local data
 data/
+models/
 results/
+notebooks/
+
+# Large files
 *.wav
 *.mp4
 *.npy
 *.npz
-.DS_Store
-__pycache__/
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.joblib
+
+# Logs
+*.log
+wandb/
+runs/
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
