@@ -1,0 +1,8 @@
+data/
+results/
+*.wav
+*.mp4
+*.npy
+*.npz
+.DS_Store
+__pycache__/
