@@ -12,7 +12,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class FusionMLP(nn.Module):
-    def __init__(self, input_dim=1040, embed_dim=256):
+    def __init__(self, input_dim, embed_dim=256):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, 512),
@@ -34,8 +34,10 @@ def main():
     std = np.load(RESULTS_DIR / "feature_std.npy")
     X_unknown = (X_unknown - mean) / std
 
-    model = FusionMLP(input_dim=1040, embed_dim=256).to(DEVICE)
-    model.load_state_dict(torch.load(MODEL_DIR / "holdout10_fusion3_mlp_arcface.pt", map_location=DEVICE))
+    model = FusionMLP(input_dim=X_unknown.shape[1], embed_dim=256).to(DEVICE)
+    model.load_state_dict(
+        torch.load(MODEL_DIR / "holdout10_fusion3_mlp_arcface.pt", map_location=DEVICE)
+    )
     model.eval()
 
     with torch.no_grad():
