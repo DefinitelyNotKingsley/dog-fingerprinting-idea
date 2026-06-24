@@ -13,13 +13,13 @@ DATA_DIR = Path("data")
 RESULTS_DIR = Path("results")
 RESULTS_DIR.mkdir(exist_ok=True)
 
-X_TRAIN_PATH = DATA_DIR / "fusion3_plus_speechbrain_ecapa_train.npy"
-X_TEST_PATH = DATA_DIR / "fusion3_plus_speechbrain_ecapa_test.npy"
-Y_TRAIN_PATH = DATA_DIR / "fusion3_train_labels.npy"
-Y_TEST_PATH = DATA_DIR / "fusion3_test_labels.npy"
+X_TRAIN_PATH = RESULTS_DIR / "triplet_fusion3_train_embeddings.npy"
+X_TEST_PATH = RESULTS_DIR / "triplet_fusion3_test_embeddings.npy"
+Y_TRAIN_PATH = DATA_DIR / "train_labels.npy"
+Y_TEST_PATH = DATA_DIR / "test_labels.npy"
 
-OUT_ALL = RESULTS_DIR / "fusion3_plus_ecapa_centerloss_all_results.csv"
-OUT_SUMMARY = RESULTS_DIR / "fusion3_plus_ecapa_centerloss_summary.csv"
+OUT_ALL = RESULTS_DIR / "triplet_fusion3_all_results.csv"
+OUT_SUMMARY = RESULTS_DIR / "triplet_fusion3_summary.csv"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -32,7 +32,6 @@ LR = 1e-3
 EMBED_DIM = 256
 SCALE = 30.0
 MARGIN = 0.5
-CENTER_LOSS_WEIGHT = 0.01
 
 THRESHOLDS = np.arange(-1.0, 1.0, 0.001)
 REPORT_THRESHOLDS = np.arange(0.10, 0.95, 0.05)
@@ -73,18 +72,7 @@ class ArcFaceHead(nn.Module):
         return logits * self.scale
 
 
-class CenterLoss(nn.Module):
-    def __init__(self, num_classes, embed_dim):
-        super().__init__()
-        self.centers = nn.Parameter(torch.randn(num_classes, embed_dim))
-
-    def forward(self, embeddings, labels):
-        batch_centers = self.centers[labels]
-        return ((embeddings - batch_centers) ** 2).sum(dim=1).mean()
-
-
 def normalize(X):
-
     n = np.linalg.norm(X, axis=1, keepdims=True)
     n[n == 0] = 1
     return X / n
@@ -200,69 +188,12 @@ def compute_dir_at_far(y_eval, best_scores, closest, far_target):
 
 
 def train_model(X_train, y_train, seed):
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-
-    le = LabelEncoder()
-    y_int = le.fit_transform(y_train)
-
-    class_counts = np.bincount(y_int)
-    sample_weights = 1.0 / class_counts[y_int]
-
-    sampler = WeightedRandomSampler(
-        weights=torch.DoubleTensor(sample_weights),
-        num_samples=len(sample_weights),
-        replacement=True,
-    )
-
-    ds = TensorDataset(
-        torch.tensor(X_train, dtype=torch.float32),
-        torch.tensor(y_int, dtype=torch.long),
-    )
-
-    loader = DataLoader(ds, batch_size=BATCH_SIZE, sampler=sampler)
-
-    model = FusionMLP(input_dim=X_train.shape[1], embed_dim=EMBED_DIM).to(DEVICE)
-    head = ArcFaceHead(EMBED_DIM, len(le.classes_), SCALE, MARGIN).to(DEVICE)
-    center_loss_fn = CenterLoss(len(le.classes_), EMBED_DIM).to(DEVICE)
-
-    opt = torch.optim.AdamW(
-        list(model.parameters()) + list(head.parameters()) + list(center_loss_fn.parameters()),
-        lr=LR,
-        weight_decay=1e-4,
-    )
-
-    for epoch in range(1, EPOCHS + 1):
-        model.train()
-        head.train()
-        center_loss_fn.train()
-        total = 0.0
-
-        for xb, yb in loader:
-            xb = xb.to(DEVICE)
-            yb = yb.to(DEVICE)
-
-            emb = model(xb)
-            logits = head(emb, yb)
-            ce_loss = F.cross_entropy(logits, yb)
-            center_loss = center_loss_fn(emb, yb)
-            loss = ce_loss + CENTER_LOSS_WEIGHT * center_loss
-
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
-
-            total += loss.item() * xb.size(0)
-
-        print(f"    epoch {epoch:03d}/{EPOCHS} loss={total / len(ds):.4f}")
-
-    return model
-
+    # DogECAPA embeddings are already trained.
+    # This dummy function keeps the original script structure.
+    return None
 
 def embed(model, X):
-    model.eval()
-    with torch.no_grad():
-        return model(torch.tensor(X, dtype=torch.float32).to(DEVICE)).cpu().numpy()
+    return X
 
 
 def main():
@@ -295,8 +226,9 @@ def main():
 
         X_unknown_test = X_test_full[unknown_test_mask]
 
-        X_train_std, X_known_test_std, mean, std = standardize(X_train, X_known_test)
-        X_unknown_test_std = (X_unknown_test - mean) / std
+        X_train_std = X_train
+        X_known_test_std = X_known_test
+        X_unknown_test_std = X_unknown_test
 
         print("\n==============================")
         print(f"Run {run + 1}/{N_RUNS}")
@@ -406,7 +338,7 @@ def main():
     mean_df = all_df.groupby(["enroll_k", "threshold"])[metric_cols].mean()
     print(mean_df.sort_values("overall_accuracy", ascending=False).head(15))
 
-    print("\nFusion3 + SpeechBrain ECAPA + Center Loss summary by enrollment size:")
+    print("\nTriplet Fusion3 summary by enrollment size:")
     compact = all_df.groupby("enroll_k")[
         ["EER_percent", "minDCF", "DIR@FAR=0.001", "DIR@FAR=0.01", "DIR@FAR=0.1"]
     ].agg(["mean", "std"])

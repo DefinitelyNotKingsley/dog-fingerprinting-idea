@@ -38,3 +38,6 @@ runs/
 # Temporary files
 *.tmp
 *.bak
+scripts_archive/
+pretrained_models/
+patch_voxblink_eval.py
